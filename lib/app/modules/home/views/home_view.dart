@@ -13,65 +13,59 @@ class HomeView extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Obx(() {
-            switch (controller.currentIndex.value) {
-              case 0:
-                return const ExpensesView();
-              case 1:
-                return const AnalyticsView();
-              case 2:
-                return const ScanReceiptView();
-              case 3:
-                return const SmsView();
-              case 4:
-                return const BudgetView();
-              default:
-                return const ExpensesView();
-            }
-          }),
-          Positioned(
-            bottom: 80,
-            right: 16,
-            child: Obx(
-              () => Text(
-                'Version: ${controller.platformVersion.value}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ),
+      body: _buildBody(),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Obx _buildBottomNav() {
+    return Obx(
+      () => BottomNavigationBar(
+        currentIndex: controller.currentIndex.value,
+        onTap: controller.changePage,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet),
+            label: 'Expenses',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.document_scanner),
+            label: 'Scan',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'SMS',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.savings),
+            label: 'Budget',
           ),
         ],
       ),
-      bottomNavigationBar: Obx(
-        () => BottomNavigationBar(
-          currentIndex: controller.currentIndex.value,
-          onTap: controller.changePage,
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet),
-              label: 'Expenses',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.analytics),
-              label: 'Analytics',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.document_scanner),
-              label: 'Scan',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.message),
-              label: 'SMS',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.savings),
-              label: 'Budget',
-            ),
-          ],
-        ),
-      ),
     );
+  }
+
+  Obx _buildBody() {
+    return Obx(() {
+      switch (controller.currentIndex.value) {
+        case 0:
+          return const ExpensesView();
+        case 1:
+          return const AnalyticsView();
+        case 2:
+          return const ScanReceiptView();
+        case 3:
+          return const SmsView();
+        case 4:
+          return const BudgetView();
+        default:
+          return const ExpensesView();
+      }
+    });
   }
 }

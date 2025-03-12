@@ -1,24 +1,41 @@
 import '../models/transaction.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class TransactionRepository {
-  final List<Transaction> _transactions = [];
+  static const String boxName = 'transactions';
+  Box<Transaction>? _transactionBox;
 
-  Future<List<Transaction>> getAll() async {
-    return _transactions;
-  }
+  bool get isInitialized => _transactionBox != null;
 
-  Future<void> add(Transaction transaction) async {
-    _transactions.add(transaction);
-  }
-
-  Future<void> update(Transaction transaction) async {
-    final index = _transactions.indexWhere((t) => t.id == transaction.id);
-    if (index != -1) {
-      _transactions[index] = transaction;
+  Future<void> init() async {
+    if (!isInitialized) {
+      _transactionBox = await Hive.openBox<Transaction>(boxName);
     }
   }
 
+  Future<List<Transaction>> getAll() async {
+    await _ensureInitialized();
+    return _transactionBox!.values.toList();
+  }
+
+  Future<void> add(Transaction transaction) async {
+    await _ensureInitialized();
+    await _transactionBox!.put(transaction.id, transaction);
+  }
+
+  Future<void> update(Transaction transaction) async {
+    await _ensureInitialized();
+    await _transactionBox!.put(transaction.id, transaction);
+  }
+
   Future<void> delete(String id) async {
-    _transactions.removeWhere((t) => t.id == id);
+    await _ensureInitialized();
+    await _transactionBox!.delete(id);
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (!isInitialized) {
+      await init();
+    }
   }
 }

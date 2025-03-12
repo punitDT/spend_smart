@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../controllers/expenses_controller.dart';
 import '../../../data/models/transaction.dart';
-import '../../../data/repositories/transaction_repository.dart';
-import '../../../data/repositories/category_repository.dart';
+import '../../../ui/components/transaction_details_dialog.dart';
+import '../../../ui/components/add_transaction_dialog.dart';
 
 class ExpensesView extends GetView<ExpensesController> {
   const ExpensesView({Key? key}) : super(key: key);
@@ -31,7 +31,9 @@ class ExpensesView extends GetView<ExpensesController> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddTransactionDialog(context),
+        onPressed: () => AddTransactionDialog(
+          onAdd: controller.addTransaction,
+        ).show(),
         child: const Icon(Icons.add),
       ),
     );
@@ -136,157 +138,10 @@ class ExpensesView extends GetView<ExpensesController> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        onTap: () => _showTransactionDetails(transaction),
-      ),
-    );
-  }
-
-  void _showAddTransactionDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    String selectedType = 'expense';
-    String? selectedCategory;
-
-    // Initialize selectedCategory if categories exist
-    if (controller.categories.isNotEmpty) {
-      selectedCategory = controller.categories.first.id;
-    }
-
-    // Check if categories are loaded
-    if (controller.categories.isEmpty) {
-      controller.loadCategories().then((_) {
-        if (controller.categories.isNotEmpty) {
-          selectedCategory = controller.categories.first.id;
-        }
-      });
-    }
-
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Add Transaction'),
-        content: Obx(() {
-          if (controller.categories.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(labelText: 'Amount'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Required';
-                      if (double.tryParse(value!) == null)
-                        return 'Invalid amount';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCategory,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: controller.categories
-                        .map(
-                          (category) => DropdownMenuItem(
-                            value: category.id,
-                            child: Text(category.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => selectedCategory = value,
-                    validator: (value) => value == null ? 'Required' : null,
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Expense'),
-                          value: 'expense',
-                          groupValue: selectedType,
-                          onChanged: (value) => selectedType = value!,
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Income'),
-                          value: 'income',
-                          groupValue: selectedType,
-                          onChanged: (value) => selectedType = value!,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          Obx(
-            () => TextButton(
-              onPressed: controller.categories.isEmpty
-                  ? null
-                  : () {
-                      if (formKey.currentState?.validate() ?? false) {
-                        final transaction = Transaction(
-                          id: DateTime.now().microsecondsSinceEpoch.toString(),
-                          title: titleController.text,
-                          amount: double.parse(amountController.text),
-                          date: DateTime.now(),
-                          category: selectedCategory!,
-                          type: selectedType,
-                        );
-                        controller.addTransaction(transaction);
-                        Get.back();
-                      }
-                    },
-              child: const Text('Add'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTransactionDetails(Transaction transaction) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Transaction Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Title: ${transaction.title}'),
-            Text(
-              'Amount: ${NumberFormat.currency(symbol: '₹').format(transaction.amount)}',
-            ),
-            Text(
-              'Category: ${controller.getCategoryName(transaction.category)}',
-            ),
-            Text('Type: ${transaction.type.capitalizeFirst}'),
-            Text(
-              'Date: ${DateFormat('MMM dd, yyyy').format(transaction.date)}',
-            ),
-            if (transaction.description != null)
-              Text('Description: ${transaction.description}'),
-            if (transaction.smsId != null) const Text('Created from SMS'),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
-        ],
+        onTap: () => TransactionDetailsDialog(
+          transaction: transaction,
+          categoryName: controller.getCategoryName(transaction.category),
+        ).show(),
       ),
     );
   }

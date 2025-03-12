@@ -7,6 +7,9 @@ import '../controllers/analytics_controller.dart';
 class AnalyticsView extends GetView<AnalyticsController> {
   const AnalyticsView({Key? key}) : super(key: key);
 
+  /// ovveride AnalyticsController
+  AnalyticsController get controller => Get.put(AnalyticsController());
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
