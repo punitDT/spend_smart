@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import '../../../services/permissions_service.dart';
 
 class SmsController extends GetxController {
+  static const platform = MethodChannel('com.spend_smart/native');
   final PermissionsService _permissionsService = Get.put(PermissionsService());
 
   final RxBool hasSmsPermission = false.obs;
@@ -31,28 +34,31 @@ class SmsController extends GetxController {
 
     isLoadingSms.value = true;
     try {
-      // Implementation for fetching SMS transactions would go here
-      // This is just placeholder logic
-      await Future.delayed(const Duration(seconds: 2));
+      final String result = await platform.invokeMethod('readSmsTransactions');
+      final List<dynamic> smsData = json.decode(result);
 
-      transactions.value = [
-        {
-          'date': DateTime.now(),
-          'amount': 150.0,
-          'type': 'debit',
-          'description': 'Sample transaction',
-        },
-        {
-          'date': DateTime.now().subtract(const Duration(days: 1)),
-          'amount': 75.0,
-          'type': 'debit',
-          'description': 'Sample transaction 2',
-        },
-      ];
+      transactions.value = smsData.map<Map<String, dynamic>>((transaction) {
+        return {
+          'date': DateTime.parse(transaction['date']),
+          'amount': transaction['amount'],
+          'type': transaction['type'],
+          'description': transaction['body'],
+          'sender': transaction['sender'],
+        };
+      }).toList();
+
+      if (transactions.isEmpty) {
+        Get.snackbar(
+          'Info',
+          'No SMS transactions found',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } catch (e) {
       Get.snackbar(
         'Error',
         'Failed to fetch SMS transactions: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       isLoadingSms.value = false;
