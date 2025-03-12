@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../expenses/views/expenses_view.dart';
 import '../../analytics/views/analytics_view.dart';
-import '../../sms/views/sms_view.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -18,7 +17,7 @@ class HomeView extends GetView<HomeController> {
           case 1:
             return const AnalyticsView();
           case 2:
-            return const SmsView();
+            return const AnalyticsView();
           default:
             return const ExpensesView();
         }
