@@ -5,15 +5,13 @@ import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 
 class ExpensesController extends GetxController {
-  final TransactionRepository _transactionRepository;
-  final CategoryRepository _categoryRepository;
+  final TransactionRepository _transactionRepository = TransactionRepository();
+  final CategoryRepository _categoryRepository = CategoryRepository();
 
   final RxList<Transaction> transactions = <Transaction>[].obs;
   final RxList<Category> categories = <Category>[].obs;
   final RxDouble totalExpenses = 0.0.obs;
   final RxDouble totalIncome = 0.0.obs;
-
-  ExpensesController(this._transactionRepository, this._categoryRepository);
 
   @override
   void onInit() {

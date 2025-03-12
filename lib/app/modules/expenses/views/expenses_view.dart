@@ -3,10 +3,14 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../controllers/expenses_controller.dart';
 import '../../../data/models/transaction.dart';
-import 'package:uuid/uuid.dart';
+import '../../../data/repositories/transaction_repository.dart';
+import '../../../data/repositories/category_repository.dart';
 
 class ExpensesView extends GetView<ExpensesController> {
   const ExpensesView({Key? key}) : super(key: key);
+
+  /// override
+  ExpensesController get controller => Get.put(ExpensesController());
 
   @override
   Widget build(BuildContext context) {
@@ -144,92 +148,112 @@ class ExpensesView extends GetView<ExpensesController> {
     String selectedType = 'expense';
     String? selectedCategory;
 
+    // Initialize selectedCategory if categories exist
+    if (controller.categories.isNotEmpty) {
+      selectedCategory = controller.categories.first.id;
+    }
+
+    // Check if categories are loaded
+    if (controller.categories.isEmpty) {
+      controller.loadCategories().then((_) {
+        if (controller.categories.isNotEmpty) {
+          selectedCategory = controller.categories.first.id;
+        }
+      });
+    }
+
     Get.dialog(
       AlertDialog(
         title: const Text('Add Transaction'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  validator:
-                      (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                TextFormField(
-                  controller: amountController,
-                  decoration: const InputDecoration(labelText: 'Amount'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value?.isEmpty ?? true) return 'Required';
-                    if (double.tryParse(value!) == null)
-                      return 'Invalid amount';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Obx(
-                  () => DropdownButtonFormField<String>(
+        content: Obx(() {
+          if (controller.categories.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Required' : null,
+                  ),
+                  TextFormField(
+                    controller: amountController,
+                    decoration: const InputDecoration(labelText: 'Amount'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) return 'Required';
+                      if (double.tryParse(value!) == null)
+                        return 'Invalid amount';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
                     value: selectedCategory,
                     decoration: const InputDecoration(labelText: 'Category'),
-                    items:
-                        controller.categories
-                            .map(
-                              (category) => DropdownMenuItem(
-                                value: category.id,
-                                child: Text(category.name),
-                              ),
-                            )
-                            .toList(),
+                    items: controller.categories
+                        .map(
+                          (category) => DropdownMenuItem(
+                            value: category.id,
+                            child: Text(category.name),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) => selectedCategory = value,
                     validator: (value) => value == null ? 'Required' : null,
                   ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Expense'),
-                        value: 'expense',
-                        groupValue: selectedType,
-                        onChanged: (value) => selectedType = value!,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text('Expense'),
+                          value: 'expense',
+                          groupValue: selectedType,
+                          onChanged: (value) => selectedType = value!,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Income'),
-                        value: 'income',
-                        groupValue: selectedType,
-                        onChanged: (value) => selectedType = value!,
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text('Income'),
+                          value: 'income',
+                          groupValue: selectedType,
+                          onChanged: (value) => selectedType = value!,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        }),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                final transaction = Transaction(
-                  id: const Uuid().v4(),
-                  title: titleController.text,
-                  amount: double.parse(amountController.text),
-                  date: DateTime.now(),
-                  category: selectedCategory!,
-                  type: selectedType,
-                );
-                controller.addTransaction(transaction);
-                Get.back();
-              }
-            },
-            child: const Text('Add'),
+          Obx(
+            () => TextButton(
+              onPressed: controller.categories.isEmpty
+                  ? null
+                  : () {
+                      if (formKey.currentState?.validate() ?? false) {
+                        final transaction = Transaction(
+                          id: DateTime.now().microsecondsSinceEpoch.toString(),
+                          title: titleController.text,
+                          amount: double.parse(amountController.text),
+                          date: DateTime.now(),
+                          category: selectedCategory!,
+                          type: selectedType,
+                        );
+                        controller.addTransaction(transaction);
+                        Get.back();
+                      }
+                    },
+              child: const Text('Add'),
+            ),
           ),
         ],
       ),

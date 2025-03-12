@@ -52,33 +52,36 @@ class AnalyticsView extends GetView<AnalyticsController> {
             Obx(
               () => DropdownButton<int>(
                 value: controller.selectedMonth.value,
-                items:
-                    List.generate(12, (index) => index + 1)
-                        .map(
-                          (month) => DropdownMenuItem(
-                            value: month,
-                            child: Text(
-                              DateFormat('MMMM').format(DateTime(2024, month)),
-                            ),
+                items: List.generate(12, (index) => index + 1)
+                    .map(
+                      (month) => DropdownMenuItem(
+                        value: month,
+                        child: Text(
+                          DateFormat('MMMM').format(
+                            DateTime(controller.selectedYear.value, month),
                           ),
-                        )
-                        .toList(),
-                onChanged: (value) => controller.updateSelectedMonth(value!),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => value != null
+                    ? controller.updateSelectedMonth(value)
+                    : null,
               ),
             ),
             Obx(
               () => DropdownButton<int>(
                 value: controller.selectedYear.value,
-                items:
-                    List.generate(5, (index) => DateTime.now().year - index)
-                        .map(
-                          (year) => DropdownMenuItem(
-                            value: year,
-                            child: Text(year.toString()),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (value) => controller.updateSelectedYear(value!),
+                items: List.generate(5, (index) => DateTime.now().year - index)
+                    .map(
+                      (year) => DropdownMenuItem(
+                        value: year,
+                        child: Text(year.toString()),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    value != null ? controller.updateSelectedYear(value) : null,
               ),
             ),
           ],
@@ -96,25 +99,23 @@ class AnalyticsView extends GetView<AnalyticsController> {
 
       return PieChart(
         PieChartData(
-          sections:
-              entries
-                  .map(
-                    (entry) => PieChartSectionData(
-                      value: entry.value,
-                      title:
-                          '${controller.getPercentageForCategory(entry.key).toStringAsFixed(1)}%',
-                      color:
-                          Colors.primaries[entries.indexOf(entry) %
-                              Colors.primaries.length],
-                      radius: 100,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                  .toList(),
+          sections: entries
+              .map(
+                (entry) => PieChartSectionData(
+                  value: entry.value,
+                  title:
+                      '${controller.getPercentageForCategory(entry.key).toStringAsFixed(1)}%',
+                  color: Colors.primaries[
+                      entries.indexOf(entry) % Colors.primaries.length],
+                  radius: 100,
+                  titleStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              )
+              .toList(),
           sectionsSpace: 2,
           centerSpaceRadius: 40,
         ),
@@ -156,9 +157,8 @@ class AnalyticsView extends GetView<AnalyticsController> {
         return const Center(child: Text('No data available'));
       }
 
-      final maxAmount = entries
-          .map((e) => e.value)
-          .reduce((a, b) => a > b ? a : b);
+      final maxAmount =
+          entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -195,20 +195,19 @@ class AnalyticsView extends GetView<AnalyticsController> {
             ),
             borderData: FlBorderData(show: false),
             gridData: const FlGridData(show: false),
-            barGroups:
-                entries.asMap().entries.map((entry) {
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: entry.value.value,
-                        color: Colors.blue,
-                        width: 20,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  );
-                }).toList(),
+            barGroups: entries.asMap().entries.map((entry) {
+              return BarChartGroupData(
+                x: entry.key,
+                barRods: [
+                  BarChartRodData(
+                    toY: entry.value.value,
+                    color: Colors.blue,
+                    width: 20,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
         ),
       );

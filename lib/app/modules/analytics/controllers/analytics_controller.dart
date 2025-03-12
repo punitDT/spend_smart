@@ -6,8 +6,8 @@ import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 
 class AnalyticsController extends GetxController {
-  final TransactionRepository _transactionRepository;
-  final CategoryRepository _categoryRepository;
+  final TransactionRepository _transactionRepository = TransactionRepository();
+  final CategoryRepository _categoryRepository = CategoryRepository();
 
   final RxList<Transaction> transactions = <Transaction>[].obs;
   final RxList<Category> categories = <Category>[].obs;
@@ -15,8 +15,6 @@ class AnalyticsController extends GetxController {
   final RxMap<String, double> monthlyTotals = <String, double>{}.obs;
   final RxInt selectedYear = DateTime.now().year.obs;
   final RxInt selectedMonth = DateTime.now().month.obs;
-
-  AnalyticsController(this._transactionRepository, this._categoryRepository);
 
   @override
   void onInit() {
