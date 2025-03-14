@@ -3,19 +3,21 @@ import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import '../../data/models/transaction.dart';
 import '../../modules/expenses/controllers/expenses_controller.dart';
+import 'package:intl/intl.dart';
 
 enum TransactionType { expense, income }
 
 class AddTransactionDialog {
-  final Function(Transaction) onAdd;
+  final Future<bool> Function(Transaction) onAdd;
 
-  AddTransactionDialog({required this.onAdd});
+  const AddTransactionDialog({required this.onAdd});
 
-  void show() {
+  Future<void> show() async {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final selectedType = TransactionType.expense.obs;
+    final selectedDate = DateTime.now().obs;
     String? selectedCategory;
     final controller = Get.find<ExpensesController>();
 
@@ -110,6 +112,30 @@ class AddTransactionDialog {
                     validator: (value) => value == null ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
+                  // Date picker field
+                  InkWell(
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: Get.context!,
+                        initialDate: selectedDate.value,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        selectedDate.value = picked;
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Date',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Obx(() => Text(
+                            DateFormat('MMM dd, yyyy')
+                                .format(selectedDate.value),
+                          )),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -121,18 +147,20 @@ class AddTransactionDialog {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
                 final transaction = Transaction(
                   id: DateTime.now().microsecondsSinceEpoch.toString(),
                   title: titleController.text,
                   amount: double.parse(amountController.text),
-                  date: DateTime.now(),
+                  date: selectedDate.value,
                   category: selectedCategory!,
                   type: selectedType.value.name,
                 );
-                onAdd(transaction);
-                Get.back();
+                final success = await onAdd(transaction);
+                if (success) {
+                  Get.back();
+                }
               }
             },
             child: const Text('Add'),

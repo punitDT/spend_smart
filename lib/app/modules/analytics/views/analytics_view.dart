@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
 import '../controllers/analytics_controller.dart';
 
@@ -17,6 +17,20 @@ class AnalyticsView extends GetView<AnalyticsController> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Analytics'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+                await controller.refreshData();
+                Get.snackbar(
+                  'Success',
+                  'Analytics data refreshed',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [Tab(text: 'Categories'), Tab(text: 'Monthly Trend')],
           ),
@@ -31,106 +45,224 @@ class AnalyticsView extends GetView<AnalyticsController> {
   Widget _buildCategoryAnalytics() {
     return Column(
       children: [
-        _buildMonthYearPicker(),
-        Expanded(
+        Material(
+          color: Get.theme.primaryColor,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Filter: ',
+                      style: TextStyle(
+                        color: Get.theme.colorScheme.onPrimary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Obx(
+                      () => DropdownButton<int>(
+                        value: controller.selectedMonth.value,
+                        dropdownColor: Get.theme.primaryColor,
+                        isDense: true,
+                        items: List.generate(12, (index) => index + 1)
+                            .map(
+                              (month) => DropdownMenuItem(
+                                value: month,
+                                child: Text(
+                                  DateFormat('MMM').format(
+                                    DateTime(2024, month),
+                                  ),
+                                  style: TextStyle(
+                                    color: Get.theme.colorScheme.onPrimary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => value != null
+                            ? controller.updateSelectedMonth(value)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Obx(
+                      () => DropdownButton<int>(
+                        value: controller.selectedYear.value,
+                        dropdownColor: Get.theme.primaryColor,
+                        isDense: true,
+                        items: List.generate(
+                                5, (index) => DateTime.now().year - index)
+                            .map(
+                              (year) => DropdownMenuItem(
+                                value: year,
+                                child: Text(
+                                  year.toString(),
+                                  style: TextStyle(
+                                    color: Get.theme.colorScheme.onPrimary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => value != null
+                            ? controller.updateSelectedYear(value)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 200,
           child: Row(
             children: [
-              Expanded(child: _buildPieChart()),
-              Expanded(child: _buildCategoryList()),
+              Expanded(child: _buildExpensePieChart()),
+              Expanded(child: _buildIncomePieChart()),
             ],
+          ),
+        ),
+        Expanded(
+          child: DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                const TabBar(
+                  tabs: [
+                    Tab(text: 'Expenses'),
+                    Tab(text: 'Income'),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildCategoryListContent(isExpense: true),
+                      _buildCategoryListContent(isExpense: false),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMonthYearPicker() {
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Obx(
-              () => DropdownButton<int>(
-                value: controller.selectedMonth.value,
-                items: List.generate(12, (index) => index + 1)
-                    .map(
-                      (month) => DropdownMenuItem(
-                        value: month,
-                        child: Text(
-                          DateFormat('MMMM').format(
-                            DateTime(controller.selectedYear.value, month),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => value != null
-                    ? controller.updateSelectedMonth(value)
-                    : null,
-              ),
-            ),
-            Obx(
-              () => DropdownButton<int>(
-                value: controller.selectedYear.value,
-                items: List.generate(5, (index) => DateTime.now().year - index)
-                    .map(
-                      (year) => DropdownMenuItem(
-                        value: year,
-                        child: Text(year.toString()),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) =>
-                    value != null ? controller.updateSelectedYear(value) : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPieChart() {
+  Widget _buildExpensePieChart() {
     return Obx(() {
-      final entries = controller.getSortedCategoryTotals();
+      final entries = controller.getSortedExpenseTotals();
       if (entries.isEmpty) {
-        return const Center(child: Text('No data available'));
+        return const Center(child: Text('No expenses data'));
       }
 
-      return PieChart(
-        PieChartData(
-          sections: entries
-              .map(
-                (entry) => PieChartSectionData(
-                  value: entry.value,
-                  title:
-                      '${controller.getPercentageForCategory(entry.key).toStringAsFixed(1)}%',
-                  color: Colors.primaries[
-                      entries.indexOf(entry) % Colors.primaries.length],
-                  radius: 100,
-                  titleStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              )
-              .toList(),
-          sectionsSpace: 2,
-          centerSpaceRadius: 40,
-        ),
+      return SfCircularChart(
+        margin: const EdgeInsets.all(0),
+        annotations: [
+          CircularChartAnnotation(
+            widget: Text(
+              'Total\n₹${NumberFormat.compact().format(controller.getTotalExpenses())}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Get.theme.colorScheme.error,
+              ),
+            ),
+          ),
+        ],
+        series: <CircularSeries>[
+          PieSeries<MapEntry<String, double>, String>(
+            dataSource: entries,
+            xValueMapper: (MapEntry<String, double> data, _) =>
+                controller.getCategoryName(data.key),
+            yValueMapper: (MapEntry<String, double> data, _) => data.value,
+            dataLabelMapper: (MapEntry<String, double> data, _) =>
+                '${controller.getCategoryName(data.key)}\n₹${NumberFormat.compact().format(data.value)}',
+            dataLabelSettings: const DataLabelSettings(
+              isVisible: true,
+              labelPosition: ChartDataLabelPosition.outside,
+              labelIntersectAction: LabelIntersectAction.shift,
+              connectorLineSettings: ConnectorLineSettings(
+                type: ConnectorType.line,
+                width: 0.5,
+                length: '15%',
+              ),
+            ),
+            enableTooltip: true,
+            pointColorMapper: (MapEntry<String, double> data, _) =>
+                Colors.red[(entries.indexOf(data) + 1) * 100],
+          )
+        ],
       );
     });
   }
 
-  Widget _buildCategoryList() {
+  Widget _buildIncomePieChart() {
     return Obx(() {
-      final entries = controller.getSortedCategoryTotals();
+      final entries = controller.getSortedIncomeTotals();
       if (entries.isEmpty) {
-        return const Center(child: Text('No data available'));
+        return const Center(child: Text('No income data'));
+      }
+
+      return SfCircularChart(
+        margin: const EdgeInsets.all(0),
+        annotations: [
+          CircularChartAnnotation(
+            widget: Text(
+              'Total\n₹${NumberFormat.compact().format(controller.getTotalIncome())}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Get.theme.colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+        series: <CircularSeries>[
+          PieSeries<MapEntry<String, double>, String>(
+            dataSource: entries,
+            xValueMapper: (MapEntry<String, double> data, _) =>
+                controller.getCategoryName(data.key),
+            yValueMapper: (MapEntry<String, double> data, _) => data.value,
+            dataLabelMapper: (MapEntry<String, double> data, _) =>
+                '${controller.getCategoryName(data.key)}\n₹${NumberFormat.compact().format(data.value)}',
+            dataLabelSettings: const DataLabelSettings(
+              isVisible: true,
+              labelPosition: ChartDataLabelPosition.outside,
+              labelIntersectAction: LabelIntersectAction.shift,
+              connectorLineSettings: ConnectorLineSettings(
+                type: ConnectorType.line,
+                width: 0.5,
+                length: '15%',
+              ),
+            ),
+            enableTooltip: true,
+            pointColorMapper: (MapEntry<String, double> data, _) =>
+                Colors.green[(entries.indexOf(data) + 1) * 100],
+          )
+        ],
+      );
+    });
+  }
+
+  Widget _buildCategoryListContent({required bool isExpense}) {
+    return Obx(() {
+      final entries = isExpense
+          ? controller.getSortedExpenseTotals()
+          : controller.getSortedIncomeTotals();
+
+      if (entries.isEmpty) {
+        return Center(
+          child: Text('No ${isExpense ? 'expenses' : 'income'} data'),
+        );
       }
 
       return ListView.builder(
@@ -138,14 +270,29 @@ class AnalyticsView extends GetView<AnalyticsController> {
         itemBuilder: (context, index) {
           final entry = entries[index];
           final categoryName = controller.getCategoryName(entry.key);
-          final color = Colors.primaries[index % Colors.primaries.length];
+          final color = isExpense
+              ? Colors.red[(index + 1) * 100]
+              : Colors.green[(index + 1) * 100];
 
           return ListTile(
             leading: CircleAvatar(backgroundColor: color, radius: 8),
             title: Text(categoryName),
-            trailing: Text(
-              NumberFormat.currency(symbol: '₹').format(entry.value),
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            trailing: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  NumberFormat.currency(symbol: '₹').format(entry.value),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${(isExpense ? controller.getPercentageForExpenseCategory(entry.key) : controller.getPercentageForIncomeCategory(entry.key)).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: Get.theme.colorScheme.secondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -154,66 +301,206 @@ class AnalyticsView extends GetView<AnalyticsController> {
   }
 
   Widget _buildMonthlyAnalytics() {
-    return Obx(() {
-      final entries = controller.monthlyTotals.entries.toList();
-      if (entries.isEmpty) {
-        return const Center(child: Text('No data available'));
-      }
-
-      final maxAmount =
-          entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
-
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.spaceAround,
-            maxY: maxAmount * 1.2,
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    if (value.toInt() >= entries.length) return const Text('');
-                    return Text(entries[value.toInt()].key);
-                  },
+    return Column(
+      children: [
+        Material(
+          color: Get.theme.primaryColor,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Filter: ',
+                      style: TextStyle(
+                        color: Get.theme.colorScheme.onPrimary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Obx(
+                      () => DropdownButton<int>(
+                        value: controller.selectedYear.value,
+                        dropdownColor: Get.theme.primaryColor,
+                        isDense: true,
+                        items: List.generate(
+                                5, (index) => DateTime.now().year - index)
+                            .map(
+                              (year) => DropdownMenuItem(
+                                value: year,
+                                child: Text(
+                                  year.toString(),
+                                  style: TextStyle(
+                                    color: Get.theme.colorScheme.onPrimary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => value != null
+                            ? controller.updateSelectedYear(value)
+                            : null,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    return Text('₹${value.toInt()}');
-                  },
-                  reservedSize: 40,
-                ),
-              ),
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-            ),
-            borderData: FlBorderData(show: false),
-            gridData: const FlGridData(show: false),
-            barGroups: entries.asMap().entries.map((entry) {
-              return BarChartGroupData(
-                x: entry.key,
-                barRods: [
-                  BarChartRodData(
-                    toY: entry.value.value,
-                    color: Colors.blue,
-                    width: 20,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ],
-              );
-            }).toList(),
+            ],
           ),
         ),
-      );
-    });
+        Expanded(
+          child: Obx(() {
+            final trends = controller.categoryMonthlyTotals;
+            if (trends.isEmpty) {
+              return const Center(child: Text('No data available'));
+            }
+
+            // Process data for monthly chart
+            final months = [
+              'Jan',
+              'Feb',
+              'Mar',
+              'Apr',
+              'May',
+              'Jun',
+              'Jul',
+              'Aug',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dec'
+            ];
+            final List<MonthlyData> chartData = [];
+
+            // Initialize data for all months
+            for (final month in months) {
+              final monthData = MonthlyData(month);
+              double expenseTotal = 0;
+              double incomeTotal = 0;
+
+              for (final entry in trends.entries) {
+                final amount = trends[entry.key]![month]?.abs() ?? 0.0;
+                if (entry.key.startsWith('expense_')) {
+                  expenseTotal += amount;
+                } else {
+                  incomeTotal += amount;
+                }
+              }
+
+              monthData.expense = expenseTotal;
+              monthData.income = incomeTotal;
+              monthData.balance = incomeTotal - expenseTotal;
+              chartData.add(monthData);
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SfCartesianChart(
+                      plotAreaBorderWidth: 0,
+                      primaryXAxis: CategoryAxis(
+                        majorGridLines: const MajorGridLines(width: 0),
+                        labelStyle: const TextStyle(fontSize: 12),
+                      ),
+                      primaryYAxis: NumericAxis(
+                        numberFormat: NumberFormat.compactCurrency(symbol: '₹'),
+                        majorGridLines: const MajorGridLines(
+                          width: 0.5,
+                          dashArray: [5, 5],
+                        ),
+                        minimum: 0,
+                      ),
+                      series: <CartesianSeries>[
+                        ColumnSeries<MonthlyData, String>(
+                          name: 'Income',
+                          dataSource: chartData,
+                          xValueMapper: (MonthlyData data, _) => data.month,
+                          yValueMapper: (MonthlyData data, _) => data.income,
+                          width: 0.4,
+                          spacing: 0.2,
+                          color: Colors.green[300],
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(4),
+                          ),
+                          dataLabelSettings: const DataLabelSettings(
+                            isVisible: true,
+                            labelAlignment: ChartDataLabelAlignment.top,
+                            textStyle: TextStyle(fontSize: 10),
+                          ),
+                        ),
+                        ColumnSeries<MonthlyData, String>(
+                          name: 'Expense',
+                          dataSource: chartData,
+                          xValueMapper: (MonthlyData data, _) => data.month,
+                          yValueMapper: (MonthlyData data, _) => data.expense,
+                          width: 0.4,
+                          spacing: 0.2,
+                          color: Colors.red[300],
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(4),
+                          ),
+                          dataLabelSettings: const DataLabelSettings(
+                            isVisible: true,
+                            labelAlignment: ChartDataLabelAlignment.top,
+                            textStyle: TextStyle(fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLegendItem('Income', Colors.green[300]!),
+                      const SizedBox(width: 16),
+                      _buildLegendItem('Expense', Colors.red[300]!),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ],
+    );
   }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class ChartData {
+  ChartData(this.month);
+  final String month;
+  final Map<String, double> values = {};
+}
+
+class MonthlyData {
+  MonthlyData(this.month);
+  final String month;
+  double income = 0;
+  double expense = 0;
+  double balance = 0;
 }

@@ -50,20 +50,70 @@ class ExpensesController extends GetxController {
     totalIncome.value = income;
   }
 
-  Future<void> addTransaction(Transaction transaction) async {
+  Future<bool> validateExpenseLimit(Transaction transaction) async {
+    double currentExpenses = totalExpenses.value;
+    double currentIncome = totalIncome.value;
+
+    // If updating, remove the old transaction amount from the totals
+    if (transaction.id.isNotEmpty) {
+      final oldTransaction =
+          transactions.firstWhereOrNull((t) => t.id == transaction.id);
+      if (oldTransaction != null) {
+        if (oldTransaction.type == 'expense') {
+          currentExpenses -= oldTransaction.amount;
+        } else {
+          currentIncome -= oldTransaction.amount;
+        }
+      }
+    }
+
+    // Add the new transaction amount
+    if (transaction.type == 'expense') {
+      currentExpenses += transaction.amount;
+    } else {
+      currentIncome += transaction.amount;
+    }
+
+    // Check if expenses would exceed income
+    if (currentExpenses > currentIncome) {
+      Get.snackbar(
+        'Error',
+        'Cannot add expense: Total expenses would exceed total income',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Get.theme.colorScheme.error,
+        colorText: Get.theme.colorScheme.onError,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> addTransaction(Transaction transaction) async {
+    if (transaction.type == 'expense' &&
+        !await validateExpenseLimit(transaction)) {
+      return false;
+    }
+
     await _transactionRepository.add(transaction);
     await loadTransactions();
     calculateTotals();
+    return true;
+  }
+
+  Future<bool> updateTransaction(Transaction transaction) async {
+    if (transaction.type == 'expense' &&
+        !await validateExpenseLimit(transaction)) {
+      return false;
+    }
+
+    await _transactionRepository.update(transaction);
+    await loadTransactions();
+    calculateTotals();
+    return true;
   }
 
   Future<void> deleteTransaction(String id) async {
     await _transactionRepository.delete(id);
-    await loadTransactions();
-    calculateTotals();
-  }
-
-  Future<void> updateTransaction(Transaction transaction) async {
-    await _transactionRepository.update(transaction);
     await loadTransactions();
     calculateTotals();
   }

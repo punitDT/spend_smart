@@ -9,28 +9,43 @@ class AnalyticsController extends GetxController {
   final TransactionRepository _transactionRepository = TransactionRepository();
   final CategoryRepository _categoryRepository = CategoryRepository();
 
-  final RxList<Transaction> transactions = <Transaction>[].obs;
   final RxList<Category> categories = <Category>[].obs;
-  final RxMap<String, double> categoryTotals = <String, double>{}.obs;
+  final RxMap<String, double> expenseCategoryTotals = <String, double>{}.obs;
+  final RxMap<String, double> incomeCategoryTotals = <String, double>{}.obs;
   final RxMap<String, double> monthlyTotals = <String, double>{}.obs;
+  final RxMap<String, Map<String, double>> categoryMonthlyTotals =
+      <String, Map<String, double>>{}.obs;
   final RxInt selectedYear = DateTime.now().year.obs;
   final RxInt selectedMonth = DateTime.now().month.obs;
 
   @override
   void onInit() {
     super.onInit();
-    loadData();
+    _initializeData();
   }
 
-  Future<void> loadData() async {
-    await Future.wait([loadTransactions(), loadCategories()]);
+  Future<void> _initializeData() async {
+    await _transactionRepository.init();
+    await loadCategories();
+
+    // Listen to transaction changes
+    ever(_transactionRepository.transactions, (_) {
+      calculateCategoryTotals();
+      calculateMonthlyTotals();
+      calculateCategoryMonthlyTrends();
+    });
+
+    // Initial calculations
     calculateCategoryTotals();
     calculateMonthlyTotals();
+    calculateCategoryMonthlyTrends();
   }
 
-  Future<void> loadTransactions() async {
-    final allTransactions = await _transactionRepository.getAll();
-    transactions.assignAll(allTransactions);
+  Future<void> refreshData() async {
+    await _transactionRepository.refreshData();
+    calculateCategoryTotals();
+    calculateMonthlyTotals();
+    calculateCategoryMonthlyTrends();
   }
 
   Future<void> loadCategories() async {
@@ -39,32 +54,57 @@ class AnalyticsController extends GetxController {
   }
 
   void calculateCategoryTotals() {
-    final Map<String, double> totals = {};
+    final Map<String, double> expenseTotals = {};
+    final Map<String, double> incomeTotals = {};
 
-    for (var transaction in transactions) {
+    for (var transaction in _transactionRepository.transactions) {
       if (transaction.date.year == selectedYear.value &&
           transaction.date.month == selectedMonth.value) {
-        totals[transaction.category] =
-            (totals[transaction.category] ?? 0.0) +
-            (transaction.type == 'expense' ? transaction.amount : 0.0);
+        final map =
+            transaction.type == 'expense' ? expenseTotals : incomeTotals;
+        map[transaction.category] =
+            (map[transaction.category] ?? 0.0) + transaction.amount;
       }
     }
 
-    categoryTotals.assignAll(totals);
+    expenseCategoryTotals.assignAll(expenseTotals);
+    incomeCategoryTotals.assignAll(incomeTotals);
   }
 
   void calculateMonthlyTotals() {
     final Map<String, double> totals = {};
 
-    for (var transaction in transactions) {
-      if (transaction.date.year == selectedYear.value &&
-          transaction.type == 'expense') {
+    for (var transaction in _transactionRepository.transactions) {
+      if (transaction.date.year == selectedYear.value) {
         final monthKey = DateFormat('MMM').format(transaction.date);
-        totals[monthKey] = (totals[monthKey] ?? 0.0) + transaction.amount;
+        totals[monthKey] = (totals[monthKey] ?? 0.0) +
+            (transaction.type == 'expense'
+                ? transaction.amount // Remove negation for consistent display
+                : transaction.amount);
       }
     }
 
     monthlyTotals.assignAll(totals);
+  }
+
+  void calculateCategoryMonthlyTrends() {
+    final Map<String, Map<String, double>> trends = {};
+
+    for (var transaction in _transactionRepository.transactions) {
+      if (transaction.date.year == selectedYear.value) {
+        final monthKey = DateFormat('MMM').format(transaction.date);
+        final categoryKey = '${transaction.type}_${transaction.category}';
+
+        if (!trends.containsKey(categoryKey)) {
+          trends[categoryKey] = {};
+        }
+
+        trends[categoryKey]![monthKey] =
+            (trends[categoryKey]![monthKey] ?? 0.0) + transaction.amount;
+      }
+    }
+
+    categoryMonthlyTotals.assignAll(trends);
   }
 
   void updateSelectedMonth(int month) {
@@ -76,6 +116,7 @@ class AnalyticsController extends GetxController {
     selectedYear.value = year;
     calculateCategoryTotals();
     calculateMonthlyTotals();
+    calculateCategoryMonthlyTrends();
   }
 
   String getCategoryName(String categoryId) {
@@ -85,19 +126,36 @@ class AnalyticsController extends GetxController {
         'Uncategorized';
   }
 
-  List<MapEntry<String, double>> getSortedCategoryTotals() {
-    final entries = categoryTotals.entries.toList();
+  List<MapEntry<String, double>> getSortedExpenseTotals() {
+    final entries = expenseCategoryTotals.entries.toList();
+    entries.sort((a, b) => b.value.compareTo(a.value));
+    return entries;
+  }
+
+  List<MapEntry<String, double>> getSortedIncomeTotals() {
+    final entries = incomeCategoryTotals.entries.toList();
     entries.sort((a, b) => b.value.compareTo(a.value));
     return entries;
   }
 
   double getTotalExpenses() {
-    return categoryTotals.values.fold(0.0, (sum, amount) => sum + amount);
+    return expenseCategoryTotals.values
+        .fold(0.0, (sum, amount) => sum + amount);
   }
 
-  double getPercentageForCategory(String categoryId) {
+  double getTotalIncome() {
+    return incomeCategoryTotals.values.fold(0.0, (sum, amount) => sum + amount);
+  }
+
+  double getPercentageForExpenseCategory(String categoryId) {
     final total = getTotalExpenses();
     if (total == 0) return 0;
-    return (categoryTotals[categoryId] ?? 0) / total * 100;
+    return ((expenseCategoryTotals[categoryId] ?? 0) / total * 100);
+  }
+
+  double getPercentageForIncomeCategory(String categoryId) {
+    final total = getTotalIncome();
+    if (total == 0) return 0;
+    return ((incomeCategoryTotals[categoryId] ?? 0) / total * 100);
   }
 }
