@@ -5,6 +5,7 @@ import '../controllers/expenses_controller.dart';
 import '../../../data/models/transaction.dart';
 import '../../../ui/components/transaction_details_dialog.dart';
 import '../../../ui/components/add_transaction_dialog.dart';
+import '../../../ui/components/delete_confirmation_dialog.dart';
 
 class ExpensesView extends GetView<ExpensesController> {
   const ExpensesView({Key? key}) : super(key: key);
@@ -109,10 +110,19 @@ class ExpensesView extends GetView<ExpensesController> {
     ).format(transaction.amount);
     final date = DateFormat('MMM dd, yyyy').format(transaction.date);
 
+    void showDeleteConfirmation() {
+      DeleteConfirmationDialog(
+        onConfirm: () => controller.deleteTransaction(transaction.id),
+      ).show();
+    }
+
     return Dismissible(
       key: Key(transaction.id),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => controller.deleteTransaction(transaction.id),
+      confirmDismiss: (_) async {
+        showDeleteConfirmation();
+        return false; // This prevents the automatic dismissal
+      },
       background: Container(
         color: Colors.red,
         alignment: Alignment.centerRight,
@@ -131,12 +141,21 @@ class ExpensesView extends GetView<ExpensesController> {
         subtitle: Text(
           '${controller.getCategoryName(transaction.category)} • $date',
         ),
-        trailing: Text(
-          amount,
-          style: TextStyle(
-            color: isExpense ? Colors.red : Colors.green,
-            fontWeight: FontWeight.bold,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              amount,
+              style: TextStyle(
+                color: isExpense ? Colors.red : Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: showDeleteConfirmation,
+            ),
+          ],
         ),
         onTap: () => TransactionDetailsDialog(
           transaction: transaction,

@@ -75,12 +75,14 @@ class AddTransactionDialog {
                       )),
                   const SizedBox(height: 16),
                   TextFormField(
+                    textInputAction: TextInputAction.next,
                     controller: titleController,
                     decoration: const InputDecoration(labelText: 'Title'),
                     validator: (value) =>
                         value?.isEmpty ?? true ? 'Required' : null,
                   ),
                   TextFormField(
+                    textInputAction: TextInputAction.next,
                     controller: amountController,
                     decoration: const InputDecoration(labelText: 'Amount'),
                     keyboardType: TextInputType.number,
