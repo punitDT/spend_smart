@@ -60,8 +60,9 @@ class AnalyticsController extends GetxController {
     for (var transaction in _transactionRepository.transactions) {
       if (transaction.date.year == selectedYear.value &&
           transaction.date.month == selectedMonth.value) {
-        final map =
-            transaction.type == 'expense' ? expenseTotals : incomeTotals;
+        final map = transaction.type == TransactionType.expense
+            ? expenseTotals
+            : incomeTotals;
         map[transaction.category] =
             (map[transaction.category] ?? 0.0) + transaction.amount;
       }
@@ -78,8 +79,8 @@ class AnalyticsController extends GetxController {
       if (transaction.date.year == selectedYear.value) {
         final monthKey = DateFormat('MMM').format(transaction.date);
         totals[monthKey] = (totals[monthKey] ?? 0.0) +
-            (transaction.type == 'expense'
-                ? transaction.amount // Remove negation for consistent display
+            (transaction.type == TransactionType.expense
+                ? transaction.amount
                 : transaction.amount);
       }
     }

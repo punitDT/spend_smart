@@ -7,17 +7,21 @@ import 'app/routes/app_pages.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+
+  // Register the TransactionType enum adapter
+  Hive.registerAdapter(TransactionTypeAdapter());
+
+  // Register the Transaction class adapter
   Hive.registerAdapter(TransactionAdapter());
 
   runApp(
     GetMaterialApp(
       title: "SpendSmart",
-      debugShowCheckedModeBanner: false,
-      initialRoute: Routes.HOME,
+      initialRoute: AppPages.INITIAL,
       getPages: AppPages.routes,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
     ),
   );

@@ -104,7 +104,7 @@ class ExpensesView extends GetView<ExpensesController> {
   }
 
   Widget _buildTransactionItem(Transaction transaction) {
-    final isExpense = transaction.type == 'expense';
+    final isExpense = transaction.type == TransactionType.expense;
     final amount = NumberFormat.currency(
       symbol: '₹',
     ).format(transaction.amount);

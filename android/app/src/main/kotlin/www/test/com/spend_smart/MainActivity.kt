@@ -5,13 +5,19 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.provider.Telephony
 import android.content.ContentResolver
+import android.util.Log
+import android.annotation.SuppressLint
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.spend_smart/native"
+    companion object {
+        private const val TAG = "MainActivity"
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -23,7 +29,9 @@ class MainActivity : FlutterActivity() {
                 }
                 "readSmsTransactions" -> {
                     try {
-                        val smsMessages = readSmsMessages()
+                        val startDate = call.argument<String>("startDate")
+                        val endDate = call.argument<String>("endDate")
+                        val smsMessages = readSmsMessages(startDate, endDate)
                         result.success(smsMessages)
                     } catch (e: Exception) {
                         result.error("SMS_READ_ERROR", e.message, null)
@@ -36,9 +44,56 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun readSmsMessages(): String {
+    @SuppressLint("Range")
+    private fun readSmsMessages(startDate: String?, endDate: String?): String {
+        Log.d(TAG, "Starting SMS read operation")
+        Log.d(TAG, "Start date: $startDate")
+        Log.d(TAG, "End date: $endDate")
+
         val jsonArray = JSONArray()
         val contentResolver: ContentResolver = context.contentResolver
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.getDefault())
+        val selection = StringBuilder()
+        val selectionArgs = mutableListOf<String>()
+
+        // Convert startDate and endDate to timestamps (milliseconds)
+        val startTime: Long? = startDate?.let {
+            try {
+                dateFormat.parse(it)?.time
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing start date: ${e.message}", e)
+                null
+            }
+        }
+
+        val endTime: Long? = endDate?.let {
+            try {
+                dateFormat.parse(it)?.time
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing end date: ${e.message}", e)
+                null
+            }
+        } ?: System.currentTimeMillis() // Default to current time if endDate is null
+
+        // Construct selection query
+        when {
+            startTime != null && endTime != null -> {
+                selection.append("${Telephony.Sms.DATE} BETWEEN ? AND ?")
+                selectionArgs.add(startTime.toString())
+                selectionArgs.add(endTime.toString())
+            }
+            startTime != null -> {
+                selection.append("${Telephony.Sms.DATE} >= ?")
+                selectionArgs.add(startTime.toString())
+            }
+            endTime != null -> {
+                selection.append("${Telephony.Sms.DATE} <= ?")
+                selectionArgs.add(endTime.toString())
+            }
+        }
+
+        // Query SMS messages
         val cursor = contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
@@ -46,58 +101,28 @@ class MainActivity : FlutterActivity() {
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.DATE
             ),
-            null,
-            null,
-            "date DESC"
+            if (selection.isNotEmpty()) selection.toString() else null,
+            if (selectionArgs.isNotEmpty()) selectionArgs.toTypedArray() else null,
+            "${Telephony.Sms.DATE} DESC"
         )
 
         cursor?.use {
-            val bodyIndex = it.getColumnIndex(Telephony.Sms.BODY)
-            val addressIndex = it.getColumnIndex(Telephony.Sms.ADDRESS)
-            val dateIndex = it.getColumnIndex(Telephony.Sms.DATE)
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-
             while (it.moveToNext()) {
-                val body = it.getString(bodyIndex)
-                val address = it.getString(addressIndex)
-                val date = it.getLong(dateIndex)
+                val body = it.getString(it.getColumnIndex(Telephony.Sms.BODY)) ?: ""
+                val address = it.getString(it.getColumnIndex(Telephony.Sms.ADDRESS)) ?: ""
+                val date = it.getLong(it.getColumnIndex(Telephony.Sms.DATE))
 
-                // Parse transaction details from SMS body
-                val transactionDetails = parseTransactionFromSms(body)
-                if (transactionDetails != null) {
-                    val smsJson = JSONObject().apply {
-                        put("body", body)
-                        put("sender", address)
-                        put("date", dateFormat.format(Date(date)))
-                        put("amount", transactionDetails.first)
-                        put("type", transactionDetails.second)
-                    }
-                    jsonArray.put(smsJson)
+                val smsData = JSONObject().apply {
+                    put("body", body)
+                    put("sender", address)
+                    put("date", date)
                 }
+                jsonArray.put(smsData)
             }
         }
 
         return jsonArray.toString()
     }
 
-    private fun parseTransactionFromSms(body: String): Pair<Double, String>? {
-        // This is a basic implementation - you might want to enhance this based on your bank's SMS format
-        val amountPattern = Regex("(?i)(?:RS|INR|₹).?\\s*(\\d+(?:[.,]\\d{2})?)")
-        val debitKeywords = listOf("debited", "withdrawn", "spent", "paid", "debit")
-        val creditKeywords = listOf("credited", "received", "credit")
 
-        val amountMatch = amountPattern.find(body)
-        if (amountMatch != null) {
-            val amount = amountMatch.groupValues[1].replace(",", "").toDoubleOrNull()
-            if (amount != null) {
-                val type = when {
-                    debitKeywords.any { body.lowercase().contains(it) } -> "debit"
-                    creditKeywords.any { body.lowercase().contains(it) } -> "credit"
-                    else -> return null
-                }
-                return Pair(amount, type)
-            }
-        }
-        return null
-    }
 }

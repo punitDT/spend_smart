@@ -2,6 +2,14 @@ import 'package:hive/hive.dart';
 
 part 'transaction.g.dart';
 
+@HiveType(typeId: 2)
+enum TransactionType {
+  @HiveField(0)
+  income,
+  @HiveField(1)
+  expense,
+}
+
 @HiveType(typeId: 0)
 class Transaction extends HiveObject {
   @HiveField(0)
@@ -20,13 +28,16 @@ class Transaction extends HiveObject {
   final String category;
 
   @HiveField(5)
-  final String type; // income or expense
+  final TransactionType type;
 
   @HiveField(6)
   final String? description;
 
   @HiveField(7)
-  final String? smsId; // Reference to original SMS if created from SMS
+  final String? smsId;
+
+  @HiveField(8)
+  final String? transactionId;
 
   Transaction({
     required this.id,
@@ -37,5 +48,6 @@ class Transaction extends HiveObject {
     required this.type,
     this.description,
     this.smsId,
+    this.transactionId,
   });
 }
