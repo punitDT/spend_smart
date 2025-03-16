@@ -1,5 +1,6 @@
 import 'package:spend_smart/app/data/models/sms.dart';
 import 'package:spend_smart/app/data/models/transaction.dart';
+import 'package:spend_smart/app/utils/logger.dart';
 
 class TransactionsTypeAlias {
   static const List<String> incomeAliases = [
@@ -38,29 +39,70 @@ class TransactionsTypeAlias {
 
 extension SmsEtx on SMS {
   /// extract amount from sms body
-  /// use regex to find the amount
-  /// e.g. "Rs. 1234.56"
-  /// e.g. "Rs 1234.56"
-  /// e.g. "1234.56"
-  /// e.g. "INR 1234.56"
-  /// e.g. "INR. 1234.56"
-  /// e.g. "INR 1234"
-  /// e.g. "INR. 1234"
-  /// e.g. "1234"
+  /// use prefix TransactionsTypeAlias to find the amount
   double? get amountFromSms {
-    final smsBody = body ?? '';
-    final regex = RegExp(r'(\b(?:Rs|INR|₹)\.?\s*(\d+(?:\.\d{1,2})?)\b)');
-    final match = regex.firstMatch(smsBody);
-    if (match != null && match.groupCount == 2) {
-      return double.tryParse(match.group(2) ?? '');
+    try {
+      final smsBody = body;
+
+      // First try to find amount with currency symbols
+      final currencyPattern = RegExp(
+        r'(?:Rs\.?|INR|₹)\s*(\d+(?:,\d+)*(?:\.\d{0,2})?)',
+        caseSensitive: false,
+      );
+
+      var match = currencyPattern.firstMatch(smsBody);
+      if (match != null) {
+        final amountStr = match.group(1)?.replaceAll(',', '') ?? '';
+        final amount = double.tryParse(amountStr);
+        if (amount != null) return amount;
+      }
+
+      // Get all transaction type aliases
+      final allAliases = [
+        ...TransactionsTypeAlias.incomeAliases,
+        ...TransactionsTypeAlias.expenseAliases,
+        ...TransactionsTypeAlias.investmentAliases,
+      ];
+
+      // Try to find amount near transaction keywords with simpler pattern
+      for (final alias in allAliases) {
+        if (smsBody.toLowerCase().contains(alias.toLowerCase())) {
+          // Find the index of the alias
+          final aliasIndex = smsBody.toLowerCase().indexOf(alias.toLowerCase());
+          // Get substring before and after alias (within 50 chars)
+          final beforeAlias = smsBody.substring(
+            (aliasIndex - 50).clamp(0, aliasIndex),
+            aliasIndex,
+          );
+          final afterAlias = smsBody.substring(
+            aliasIndex + alias.length,
+            (aliasIndex + alias.length + 50).clamp(0, smsBody.length),
+          );
+
+          // Look for amount in both segments
+          final amountPattern = RegExp(r'\b(\d+(?:,\d+)*(?:\.\d{0,2})?)\b');
+          match = amountPattern.firstMatch(beforeAlias) ??
+              amountPattern.firstMatch(afterAlias);
+
+          if (match != null) {
+            final amountStr = match.group(1)?.replaceAll(',', '') ?? '';
+            final amount = double.tryParse(amountStr);
+            if (amount != null) return amount;
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      Logger.e('SMSEXT amount', 'Error extracting amount from SMS: $e');
+      return null;
     }
-    return null;
   }
 
   /// extract transaction type from sms
   /// use TransactionsTypeAlias to find the type
   TransactionType get transactionTypeFromSms {
-    final smsBody = body?.toLowerCase() ?? '';
+    final smsBody = body.toLowerCase();
     if (TransactionsTypeAlias.incomeAliases
         .any((alias) => smsBody.contains(alias))) {
       return TransactionType.income;
@@ -76,7 +118,7 @@ extension SmsEtx on SMS {
 
   /// extract transaction id from sms body
   String? get transactionIdFromSms {
-    final smsBody = body ?? '';
+    final smsBody = body;
     final regex = RegExp(r'(Refno|Transaction ID|Transaction Number)\s*(\d+)');
     final match = regex.firstMatch(smsBody);
     if (match != null && match.groupCount == 2) {
@@ -88,7 +130,7 @@ extension SmsEtx on SMS {
   /// is payment sms
   /// check using TransactionsTypeAlias
   bool get isPaymentSms {
-    final smsBody = body?.toLowerCase() ?? '';
+    final smsBody = body.toLowerCase();
     return TransactionsTypeAlias.incomeAliases
             .any((alias) => smsBody.contains(alias)) ||
         TransactionsTypeAlias.expenseAliases

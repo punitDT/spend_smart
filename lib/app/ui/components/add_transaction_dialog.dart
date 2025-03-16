@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:spend_smart/app/data/models/sms.dart';
+import 'package:spend_smart/app/utils/logger.dart';
 import 'package:spend_smart/app/utils/sms_etx.dart';
 import '../../data/models/transaction.dart';
 import '../../modules/expenses/controllers/expenses_controller.dart';
 import 'package:intl/intl.dart';
+import './common_snackbar.dart';
 
 class AddTransactionDialog {
   final Future<bool> Function(Transaction) onAdd;
@@ -15,9 +17,12 @@ class AddTransactionDialog {
 
   const AddTransactionDialog({required this.onAdd, this.sms});
 
-  Future<void> show() async {
+  Future<bool?> show() async {
+    Logger.i('AddTransactionDialog', 'Showing dialog');
+
     final titleController = TextEditingController();
     final amountController = TextEditingController();
+    final transactionIdController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final selectedType = TransactionType.expense.obs;
     final selectedDate = DateTime.now().obs;
@@ -31,11 +36,10 @@ class AddTransactionDialog {
 
     // Check if categories are loaded
     if (controller.categories.isEmpty) {
-      controller.loadCategories().then((_) {
-        if (controller.categories.isNotEmpty) {
-          selectedCategory = controller.categories.first.id;
-        }
-      });
+      await controller.loadCategories();
+      if (controller.categories.isNotEmpty) {
+        selectedCategory = controller.categories.first.id;
+      }
     }
 
     /// Check if SMS data is provided
@@ -44,17 +48,30 @@ class AddTransactionDialog {
       final smsTransId = sms?.transactionIdFromSms;
       final smsTransType = sms?.transactionTypeFromSms;
 
+      Logger.i('AddTransactionDialog',
+          'SMS Data: Amount=$smsAmount, TransId=$smsTransId, Type=$smsTransType');
+
+      // Set a default title based on transaction type and sender
+      titleController.text =
+          '${smsTransType?.toString().split('.').last ?? 'Transaction'} from ${sms?.sender ?? 'Unknown'}';
+
       if (smsAmount != null) {
         amountController.text = smsAmount.toString();
       }
       if (smsTransId != null) {
-        titleController.text = smsTransId.toString();
+        transactionIdController.text = smsTransId;
       }
-      selectedType(smsTransType);
-      selectedDate(sms?.date ?? DateTime.now());
+      if (smsTransType != null) {
+        selectedType.value = smsTransType;
+      }
+
+      /// format date
+      final smsDate = DateTime.parse((sms?.date ?? DateTime.now()).toString());
+      selectedDate(smsDate);
     }
 
-    await Get.dialog(
+    final result = await Get.dialog<bool>(
+      barrierDismissible: false,
       AlertDialog(
         title: const Text('Add Transaction'),
         content: Form(
@@ -97,6 +114,14 @@ class AddTransactionDialog {
                   decoration: const InputDecoration(labelText: 'Title'),
                   validator: (value) =>
                       value?.isEmpty ?? true ? 'Required' : null,
+                ),
+                TextFormField(
+                  textInputAction: TextInputAction.next,
+                  controller: transactionIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Transaction ID',
+                    hintText: 'Optional reference number',
+                  ),
                 ),
                 TextFormField(
                   textInputAction: TextInputAction.next,
@@ -157,23 +182,50 @@ class AddTransactionDialog {
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Get.back(result: false),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
-                final transaction = Transaction(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  title: titleController.text,
-                  amount: double.parse(amountController.text),
-                  date: selectedDate.value,
-                  category: selectedCategory!,
-                  type: selectedType.value,
-                );
+                try {
+                  if (selectedCategory == null) {
+                    CommonSnackbar.showError(
+                      'Error',
+                      'Please select a category',
+                    );
+                    return;
+                  }
 
-                if (await onAdd(transaction)) {
-                  Get.back();
+                  final transaction = Transaction(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: titleController.text,
+                    amount: double.parse(amountController.text),
+                    date: selectedDate.value,
+                    category: selectedCategory!,
+                    type: selectedType.value,
+                    transactionId: transactionIdController.text.isEmpty
+                        ? null
+                        : transactionIdController.text,
+                    smsId: sms?.id,
+                    smsDate: sms?.date,
+                  );
+
+                  if (await onAdd(transaction)) {
+                    Logger.i('AddTransactionDialog',
+                        'Transaction added: $transaction');
+                    Get.back(result: true);
+                  }
+
+                  Logger.i('after back AddTransactionDialog',
+                      'Transaction added: $transaction');
+                } catch (e, stack) {
+                  Logger.e('AddTransactionDialog', 'Failed to add transaction',
+                      e, stack);
+                  CommonSnackbar.showError(
+                    'Error',
+                    'Failed to add transaction: ${e.toString()}',
+                  );
                 }
               }
             },
@@ -182,5 +234,7 @@ class AddTransactionDialog {
         ],
       ),
     );
+
+    return result;
   }
 }

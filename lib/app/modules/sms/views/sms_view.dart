@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spend_smart/app/data/models/sms.dart';
 import 'package:spend_smart/app/ui/components/add_transaction_dialog.dart';
+import 'package:spend_smart/app/modules/expenses/controllers/expenses_controller.dart';
 import '../controllers/sms_controller.dart';
 
 class SmsView extends GetView<SmsController> {
@@ -146,31 +147,52 @@ class SmsView extends GetView<SmsController> {
                       itemCount: controller.smsList.length,
                       itemBuilder: (context, index) {
                         final SMS sms = controller.smsList[index];
+                        final expensesController =
+                            Get.find<ExpensesController>();
+                        final bool alreadyAdded =
+                            expensesController.hasTransactionForSms(sms);
 
                         return Card(
                           child: Column(
                             children: [
                               ListTile(
-                                title: Text(sms.body),
-                                subtitle: Text(
-                                  'From: ${sms.sender}\nDate: ${sms.date}',
-                                  style: const TextStyle(fontSize: 12),
+                                title: SelectableText(sms.body),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'From: ${sms.sender}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      'Date: ${sms.date}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    if (alreadyAdded)
+                                      Text(
+                                        'Transaction already added',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Get.theme.colorScheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 isThreeLine: true,
                               ),
-                              IconButton(
-                                onPressed: () {
-                                  /// extract all fields from message
-                                  /// and show add transaction dialog
-                                  /// with prefilled values
+                              if (!alreadyAdded)
+                                IconButton(
+                                  onPressed: () async {
+                                    await AddTransactionDialog(
+                                      onAdd: controller.addTransaction,
+                                      sms: sms,
+                                    ).show();
 
-                                  AddTransactionDialog(
-                                    onAdd: controller.addTransaction,
-                                    sms: sms,
-                                  ).show();
-                                },
-                                icon: const Icon(Icons.add),
-                              ),
+                                    controller.smsList.refresh();
+                                  },
+                                  icon: const Icon(Icons.add),
+                                ),
                             ],
                           ),
                         );

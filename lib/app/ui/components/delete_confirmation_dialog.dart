@@ -2,38 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class DeleteConfirmationDialog {
+  final VoidCallback onConfirm;
   final String title;
   final String message;
-  final VoidCallback onConfirm;
 
-  DeleteConfirmationDialog({
+  const DeleteConfirmationDialog({
+    required this.onConfirm,
     this.title = 'Delete Transaction',
     this.message = 'Are you sure you want to delete this transaction?',
-    required this.onConfirm,
   });
 
-  Future<void> show() async {
-    return Get.dialog(
+  Future<bool> show() async {
+    final result = await Get.dialog<bool>(
       AlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Get.back(result: false),
             child: const Text('Cancel'),
           ),
           TextButton(
+            onPressed: () {
+              onConfirm();
+              Get.back(result: true);
+            },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
             ),
-            onPressed: () {
-              onConfirm();
-              Get.back();
-            },
             child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    return result ?? false;
   }
 }

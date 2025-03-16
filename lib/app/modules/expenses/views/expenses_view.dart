@@ -17,12 +17,38 @@ class ExpensesView extends GetView<ExpensesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expenses'),
+        title: controller.isSelectionMode.value
+            ? Text('${controller.selectedTransactions.length} selected')
+            : const Text('Transactions'),
+        leading: controller.isSelectionMode.value
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: controller.toggleSelectionMode,
+              )
+            : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => controller.loadData(),
-          ),
+          if (controller.isSelectionMode.value)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: controller.selectedTransactions.isNotEmpty
+                  ? () async {
+                      final confirmed = await _showDeleteSelectedConfirmation();
+                      if (confirmed) {
+                        controller.deleteSelectedTransactions();
+                      }
+                    }
+                  : null,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () => controller.loadData(),
+            ),
+          if (!controller.isSelectionMode.value)
+            IconButton(
+              icon: const Icon(Icons.checklist),
+              onPressed: controller.toggleSelectionMode,
+            ),
         ],
       ),
       body: Column(
@@ -31,13 +57,27 @@ class ExpensesView extends GetView<ExpensesController> {
           Expanded(child: _buildTransactionList()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => AddTransactionDialog(
-          onAdd: controller.addTransaction,
-        ).show(),
-        child: const Icon(Icons.add),
+      floatingActionButton: Obx(
+        () => controller.isSelectionMode.value
+            ? const SizedBox()
+            : FloatingActionButton(
+                onPressed: () => AddTransactionDialog(
+                  onAdd: controller.addTransaction,
+                ).show(),
+                child: const Icon(Icons.add),
+              ),
       ),
     );
+  }
+
+  Future<bool> _showDeleteSelectedConfirmation() async {
+    final result = await DeleteConfirmationDialog(
+      title: 'Delete Selected Transactions',
+      message:
+          'Are you sure you want to delete ${controller.selectedTransactions.length} transactions?',
+      onConfirm: controller.deleteSelectedTransactions,
+    ).show();
+    return result;
   }
 
   Widget _buildSummaryCard() {
@@ -110,58 +150,87 @@ class ExpensesView extends GetView<ExpensesController> {
     ).format(transaction.amount);
     final date = DateFormat('MMM dd, yyyy').format(transaction.date);
 
-    void showDeleteConfirmation() {
-      DeleteConfirmationDialog(
+    Future<void> showDeleteConfirmation() async {
+      final confirmed = await DeleteConfirmationDialog(
         onConfirm: () => controller.deleteTransaction(transaction.id),
       ).show();
+      if (confirmed) {
+        // No need to call delete again since onConfirm already does it
+      }
     }
 
-    return Dismissible(
-      key: Key(transaction.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        showDeleteConfirmation();
-        return false; // This prevents the automatic dismissal
-      },
-      background: Container(
-        color: Colors.red,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isExpense ? Colors.red : Colors.green,
-          child: Icon(
-            isExpense ? Icons.remove : Icons.add,
-            color: Colors.white,
+    return Obx(() {
+      final isSelected =
+          controller.selectedTransactions.contains(transaction.id);
+
+      return Dismissible(
+        key: Key(transaction.id),
+        direction: controller.isSelectionMode.value
+            ? DismissDirection.none
+            : DismissDirection.endToStart,
+        confirmDismiss: (_) async {
+          await showDeleteConfirmation();
+          return false;
+        },
+        background: Container(
+          color: Colors.red,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(Icons.delete, color: Colors.white),
+        ),
+        child: Container(
+          color: isSelected ? Get.theme.colorScheme.primaryContainer : null,
+          child: ListTile(
+            leading: controller.isSelectionMode.value
+                ? Checkbox(
+                    value: isSelected,
+                    onChanged: (_) =>
+                        controller.toggleTransactionSelection(transaction.id),
+                  )
+                : CircleAvatar(
+                    backgroundColor: isExpense ? Colors.red : Colors.green,
+                    child: Icon(
+                      isExpense ? Icons.remove : Icons.add,
+                      color: Colors.white,
+                    ),
+                  ),
+            title: Text(transaction.title),
+            subtitle: Text(
+              '${controller.getCategoryName(transaction.category)} • $date',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  amount,
+                  style: TextStyle(
+                    color: isExpense ? Colors.red : Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (!controller.isSelectionMode.value)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => showDeleteConfirmation(),
+                  ),
+              ],
+            ),
+            onTap: () {
+              if (controller.isSelectionMode.value) {
+                controller.toggleTransactionSelection(transaction.id);
+              } else {
+                TransactionDetailsDialog(
+                  transaction: transaction,
+                  categoryName:
+                      controller.getCategoryName(transaction.category),
+                ).show();
+              }
+            },
+            selected: isSelected,
+            selectedTileColor: Get.theme.colorScheme.primaryContainer,
           ),
         ),
-        title: Text(transaction.title),
-        subtitle: Text(
-          '${controller.getCategoryName(transaction.category)} • $date',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              amount,
-              style: TextStyle(
-                color: isExpense ? Colors.red : Colors.green,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: showDeleteConfirmation,
-            ),
-          ],
-        ),
-        onTap: () => TransactionDetailsDialog(
-          transaction: transaction,
-          categoryName: controller.getCategoryName(transaction.category),
-        ).show(),
-      ),
-    );
+      );
+    });
   }
 }

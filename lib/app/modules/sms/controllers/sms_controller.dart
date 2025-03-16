@@ -7,6 +7,8 @@ import 'package:spend_smart/app/services/platform_service.dart';
 import 'package:spend_smart/app/utils/sms_etx.dart';
 import '../../../services/permissions_service.dart';
 import '../../../utils/logger.dart';
+import '../../../ui/components/common_snackbar.dart';
+import 'package:spend_smart/app/modules/expenses/controllers/expenses_controller.dart';
 
 class SmsController extends GetxController {
   static const String _tag = 'SmsController';
@@ -114,32 +116,48 @@ class SmsController extends GetxController {
       /// which does not contain any amount
       /// which does not contain any credit or debit keyword
       /// isPaymentSms is true
-      parsedResult =
-          parsedResult.where((sms) => sms?.isPaymentSms ?? false).toList();
+      parsedResult = parsedResult.where((sms) => sms.isPaymentSms).toList();
 
       smsList.clear();
       smsList(parsedResult);
       Logger.i(_tag, 'Successfully fetched ${smsList.length} SMS messages');
     } on PlatformException catch (e, stackTrace) {
       Logger.e(_tag, 'Platform error while fetching SMS', e, stackTrace);
-      Get.snackbar(
+      CommonSnackbar.showError(
         'Error',
         'Failed to fetch SMS messages: ${e.message}',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e, stackTrace) {
       Logger.e(_tag, 'Error fetching SMS transactions', e, stackTrace);
-      Get.snackbar(
+      CommonSnackbar.showError(
         'Error',
         'Failed to fetch SMS messages: $e',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       isLoadingSms.value = false;
     }
   }
 
-  Future<bool> addTransaction(Transaction p1) async {
-    return true;
+  Future<bool> addTransaction(Transaction transaction) async {
+    try {
+      // Use ExpensesController to add the transaction
+      final expensesController = Get.find<ExpensesController>();
+      final success = await expensesController.addTransaction(transaction);
+
+      if (success) {
+        CommonSnackbar.showSuccess(
+          'Success',
+          'Transaction added successfully',
+        );
+      }
+      return success;
+    } catch (e, stack) {
+      Logger.e('SMS', 'Failed to add transaction', e, stack);
+      CommonSnackbar.showError(
+        'Error',
+        'Failed to add transaction: ${e.toString()}',
+      );
+      return false;
+    }
   }
 }
