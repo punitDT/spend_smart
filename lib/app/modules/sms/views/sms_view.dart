@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:spend_smart/app/data/models/sms.dart';
 import 'package:spend_smart/app/ui/components/add_transaction_dialog.dart';
 import '../controllers/sms_controller.dart';
 
@@ -144,28 +145,33 @@ class SmsView extends GetView<SmsController> {
                       padding: const EdgeInsets.all(16),
                       itemCount: controller.smsList.length,
                       itemBuilder: (context, index) {
-                        final message = controller.smsList[index];
+                        final SMS sms = controller.smsList[index];
 
                         return Card(
-                          child: ListTile(
-                            title: Text(message['body']),
-                            subtitle: Text(
-                              'From: ${message['sender']}\nDate: ${message['date']}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            isThreeLine: true,
-                            trailing: IconButton(
-                              onPressed: () {
-                                /// extract all fields from message
-                                /// and show add transaction dialog
-                                /// with prefilled values
+                          child: Column(
+                            children: [
+                              ListTile(
+                                title: Text(sms.body),
+                                subtitle: Text(
+                                  'From: ${sms.sender}\nDate: ${sms.date}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                isThreeLine: true,
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  /// extract all fields from message
+                                  /// and show add transaction dialog
+                                  /// with prefilled values
 
-                                AddTransactionDialog(
-                                  onAdd: controller.addTransaction,
-                                ).show();
-                              },
-                              icon: const Icon(Icons.add),
-                            ),
+                                  AddTransactionDialog(
+                                    onAdd: controller.addTransaction,
+                                    sms: sms,
+                                  ).show();
+                                },
+                                icon: const Icon(Icons.add),
+                              ),
+                            ],
                           ),
                         );
                       },

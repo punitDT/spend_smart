@@ -8,6 +8,8 @@ enum TransactionType {
   income,
   @HiveField(1)
   expense,
+  @HiveField(2)
+  investment,
 }
 
 @HiveType(typeId: 0)
@@ -39,6 +41,9 @@ class Transaction extends HiveObject {
   @HiveField(8)
   final String? transactionId;
 
+  @HiveField(9)
+  final DateTime? smsDate;
+
   Transaction({
     required this.id,
     required this.title,
@@ -48,6 +53,7 @@ class Transaction extends HiveObject {
     required this.type,
     this.description,
     this.smsId,
+    this.smsDate,
     this.transactionId,
   });
 }

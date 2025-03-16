@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
+import 'package:spend_smart/app/data/models/sms.dart';
+import 'package:spend_smart/app/utils/sms_etx.dart';
 import '../../data/models/transaction.dart';
 import '../../modules/expenses/controllers/expenses_controller.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +10,10 @@ import 'package:intl/intl.dart';
 class AddTransactionDialog {
   final Future<bool> Function(Transaction) onAdd;
 
-  const AddTransactionDialog({required this.onAdd});
+  /// Constructor for AddTransactionDialog
+  final SMS? sms;
+
+  const AddTransactionDialog({required this.onAdd, this.sms});
 
   Future<void> show() async {
     final titleController = TextEditingController();
@@ -33,6 +38,22 @@ class AddTransactionDialog {
       });
     }
 
+    /// Check if SMS data is provided
+    if (sms != null) {
+      final smsAmount = sms?.amountFromSms;
+      final smsTransId = sms?.transactionIdFromSms;
+      final smsTransType = sms?.transactionTypeFromSms;
+
+      if (smsAmount != null) {
+        amountController.text = smsAmount.toString();
+      }
+      if (smsTransId != null) {
+        titleController.text = smsTransId.toString();
+      }
+      selectedType(smsTransType);
+      selectedDate(sms?.date ?? DateTime.now());
+    }
+
     await Get.dialog(
       AlertDialog(
         title: const Text('Add Transaction'),
@@ -52,28 +73,19 @@ class AddTransactionDialog {
                         width: 1,
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Type'),
-                          Obx(
-                            () => CupertinoSlidingSegmentedControl<
-                                TransactionType>(
-                              groupValue: selectedType.value,
-                              children: const {
-                                TransactionType.expense: Text('Expense'),
-                                TransactionType.income: Text('Income'),
-                              },
-                              onValueChanged: (value) {
-                                if (value != null) {
-                                  selectedType.value = value;
-                                }
-                              },
-                            ),
-                          ),
-                        ],
+                    child: Obx(
+                      () => CupertinoSlidingSegmentedControl<TransactionType>(
+                        groupValue: selectedType.value,
+                        children: const {
+                          TransactionType.expense: Text('Expense'),
+                          TransactionType.income: Text('Income'),
+                          TransactionType.investment: Text('Investment'),
+                        },
+                        onValueChanged: (value) {
+                          if (value != null) {
+                            selectedType.value = value;
+                          }
+                        },
                       ),
                     ),
                   ),

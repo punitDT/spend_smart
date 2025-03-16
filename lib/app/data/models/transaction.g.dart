@@ -25,6 +25,7 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       type: fields[5] as TransactionType,
       description: fields[6] as String?,
       smsId: fields[7] as String?,
+      smsDate: fields[9] as DateTime?,
       transactionId: fields[8] as String?,
     );
   }
@@ -32,7 +33,7 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
   @override
   void write(BinaryWriter writer, Transaction obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       ..writeByte(7)
       ..write(obj.smsId)
       ..writeByte(8)
-      ..write(obj.transactionId);
+      ..write(obj.transactionId)
+      ..writeByte(9)
+      ..write(obj.smsDate);
   }
 
   @override
@@ -75,6 +78,8 @@ class TransactionTypeAdapter extends TypeAdapter<TransactionType> {
         return TransactionType.income;
       case 1:
         return TransactionType.expense;
+      case 2:
+        return TransactionType.investment;
       default:
         return TransactionType.income;
     }
@@ -88,6 +93,9 @@ class TransactionTypeAdapter extends TypeAdapter<TransactionType> {
         break;
       case TransactionType.expense:
         writer.writeByte(1);
+        break;
+      case TransactionType.investment:
+        writer.writeByte(2);
         break;
     }
   }

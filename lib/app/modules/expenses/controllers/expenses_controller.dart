@@ -3,11 +3,12 @@ import '../../../data/models/transaction.dart';
 import '../../../data/models/category.dart';
 import '../../../data/repositories/transaction_repository.dart';
 import '../../../data/repositories/category_repository.dart';
+import '../../../utils/logger.dart';
 
 class ExpensesController extends GetxController {
-  final TransactionRepository _transactionRepository = TransactionRepository();
+  static const String _tag = 'ExpensesController';
+  final _transactionRepository = TransactionRepository.to;
   final CategoryRepository _categoryRepository = CategoryRepository();
-
   final RxList<Transaction> transactions = <Transaction>[].obs;
   final RxList<Category> categories = <Category>[].obs;
   final RxDouble totalExpenses = 0.0.obs;
@@ -15,18 +16,25 @@ class ExpensesController extends GetxController {
 
   @override
   void onInit() {
+    Logger.i(_tag, 'Initializing ExpensesController');
     super.onInit();
-    _initializeData();
-  }
-
-  Future<void> _initializeData() async {
-    await _transactionRepository.init();
-    await loadData();
+    loadData();
   }
 
   Future<void> loadData() async {
-    await Future.wait([loadTransactions(), loadCategories()]);
-    calculateTotals();
+    try {
+      Logger.i(_tag, 'Loading data');
+      await Future.wait([loadTransactions(), loadCategories()]);
+      calculateTotals();
+      Logger.i(_tag, 'Data loaded successfully');
+    } catch (e, stackTrace) {
+      Logger.e(_tag, 'Failed to load data', e, stackTrace);
+      Get.snackbar(
+        'Error',
+        'Failed to load expenses data: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 
   Future<void> loadTransactions() async {

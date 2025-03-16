@@ -37,5 +37,17 @@ extension TransactionExt on Transaction {
 
   String get formattedDate => '${date.day}/${date.month}/${date.year}';
   String get formattedAmount => '₹${amount.toStringAsFixed(2)}';
-  String get typeLabel => type == 'income' ? 'Income' : 'Expense';
+
+  String get transactionType {
+    switch (type) {
+      case TransactionType.income:
+        return 'Income';
+      case TransactionType.expense:
+        return 'Expense';
+      case TransactionType.investment:
+        return 'Investment';
+      default:
+        return 'Unknown';
+    }
+  }
 }
